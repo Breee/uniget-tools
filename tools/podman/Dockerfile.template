@@ -50,14 +50,15 @@ go mod vendor
 EOF
 RUN --mount=type=cache,target=/root/go/pkg/mod <<EOF
 export CGO_ENABLED=1
-make -j$(nproc) LDFLAGS_PODMAN="-s -w -extldflags '-static'" BUILDTAGS='seccomp selinux apparmor exclude_graphdriver_devicemapper containers_image_openpgp'
+# EXTRA_LDFLAGS keeps the default LDFLAGS_PODMAN (install prefix, quadlet's podman path).
+# netavark is installed to ${target}/bin; podman searches only helper dirs (not PATH) for it.
+make -j$(nproc) EXTRA_LDFLAGS="-s -w -extldflags '-static'" HELPER_BINARIES_DIR=/usr/local/bin BUILDTAGS='seccomp selinux apparmor exclude_graphdriver_devicemapper containers_image_openpgp'
 EOF
 RUN --mount=type=cache,target=/root/go/pkg/mod <<EOF
 # quadlet and rootlessport do not use cgo, so the internal linker ignores -extldflags -static
 # and links them against the musl loader. Rebuild them without cgo.
 rm -f bin/quadlet bin/rootlessport
-# EXTRA_LDFLAGS keeps the default LDFLAGS_PODMAN, which sets quadlet's podman path (BINDIR).
-make CGO_ENABLED=0 EXTRA_LDFLAGS="-s -w" BINDIR=/usr/local/bin bin/quadlet bin/rootlessport
+make CGO_ENABLED=0 EXTRA_LDFLAGS="-s -w" HELPER_BINARIES_DIR=/usr/local/bin bin/quadlet bin/rootlessport
 EOF
 RUN <<EOF
 make install             DESTDIR="${prefix}" PREFIX=""
